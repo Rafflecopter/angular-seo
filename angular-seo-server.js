@@ -24,8 +24,12 @@ var renderHtml = function(url, cb) {
     var page = require('webpage').create();
     page.settings.loadImages = false;
     page.settings.localToRemoteUrlAccessEnabled = true;
-    page.onCallback = function() {
-        cb(page.content);
+    page.onCallback = function(data) {
+        if (data.error) {
+            cb(data, page.content);
+        } else {
+            cb(null, page.content);
+        }
         page.close();
     };
 //    page.onConsoleMessage = function(msg, lineNum, sourceId) {
@@ -34,7 +38,7 @@ var renderHtml = function(url, cb) {
     page.onInitialized = function() {
        page.evaluate(function() {
             setTimeout(function() {
-                window.callPhantom();
+                window.callPhantom({error: new Error('timeout')});
             }, 10000);
         });
     };
@@ -46,9 +50,14 @@ server.listen(port, function (request, response) {
     var url = urlPrefix
       + request.url.slice(1, request.url.indexOf('?'))
       + '#!' + decodeURIComponent(route);
-    renderHtml(url, function(html) {
-        response.statusCode = 200;
-        response.write(html);
+    renderHtml(url, function(err, html) {
+        if (err) {
+            response.statusCode = 500;
+            response.write(JSON.stringify(err))
+        } else {
+            response.statusCode = 200;
+            response.write(html);
+        }
         response.close();
     });
 });
